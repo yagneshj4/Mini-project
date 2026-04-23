@@ -3,7 +3,7 @@ outer_iterations: 1
 inner_iterations: 5
 task: kriging
 dataset: Cu
-model: gpt-4o
+model: gemini-flash-latest
 temperature: 0.8
 reset_kb: false
 top_k_rag: 5

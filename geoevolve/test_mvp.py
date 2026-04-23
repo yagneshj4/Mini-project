@@ -47,14 +47,14 @@ def test_mvp():
     
     # 3. Initialize agents
     print("\n3. Initializing agents...")
-    api_key = os.getenv('OPENAI_API_KEY')
+    api_key = os.getenv('GOOGLE_API_KEY') or os.getenv('GEMINI_API_KEY')
     if not api_key:
-        print("   ✗ ERROR: OPENAI_API_KEY not set. Skipping LLM tests.")
-        print("   Set OPENAI_API_KEY=your_key in .env file or environment")
+        print("   ✗ ERROR: GOOGLE_API_KEY or GEMINI_API_KEY not set. Skipping LLM tests.")
+        print("   Set GOOGLE_API_KEY=your_key in .env file or environment")
         return
     
-    evolver = CodeEvolver(model="gpt-4o-mini", temperature=0.8)
-    analyzer = CodeAnalyzer(model="gpt-4o-mini")
+    evolver = CodeEvolver(model="gemini-flash-latest", temperature=0.8)
+    analyzer = CodeAnalyzer(model="gemini-flash-latest")
     builder = PromptBuilder()
     print("   ✓ Agents initialized")
     

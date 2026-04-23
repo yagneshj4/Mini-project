@@ -111,10 +111,10 @@ class GeoEvolve:
         
         # Initialize agents
         evolver = CodeEvolver(
-            model=self.config.get('model', 'gpt-4o-mini'),
+            model=self.config.get('model', 'gemini-flash-latest'),
             temperature=self.config.get('temperature', 0.8)
         )
-        analyzer = CodeAnalyzer()
+        analyzer = CodeAnalyzer(model=self.config.get('model', 'gemini-flash-latest'))
         builder = PromptBuilder()
         retriever = RAGRetriever()
         
@@ -298,10 +298,11 @@ class GeoEvolve:
 
 def main():
     """Main entry point."""
-    # Check for OpenAI API key
-    if not os.getenv('OPENAI_API_KEY'):
-        print("ERROR: OPENAI_API_KEY not set in environment")
-        print("Please set your OpenAI API key in .env file")
+    # Check for Gemini API key
+    api_key = os.getenv('GOOGLE_API_KEY') or os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        print("ERROR: GOOGLE_API_KEY or GEMINI_API_KEY not set in environment")
+        print("Please set your Gemini API key in .env file")
         sys.exit(1)
     
     # Initialize and run

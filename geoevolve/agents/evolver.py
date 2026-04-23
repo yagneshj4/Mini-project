@@ -1,33 +1,41 @@
 import os
 import json
-from dotenv import load_dotenv
-from openai import OpenAI
 import re
+import time
+from dotenv import load_dotenv
+import google.generativeai as genai
 
 load_dotenv()
 
 class CodeEvolver:
     """
     LLM-based code mutation and evolution engine.
-    Generates improved kriging code using GPT-4o.
+    Generates improved kriging code using Gemini.
     """
     
-    def __init__(self, model="gpt-4o", temperature=0.8, max_retries=3):
+    def __init__(self, model="gemini-flash-latest", temperature=0.8, max_retries=3):
         """
-        Initialize the evolver with OpenAI client.
+        Initialize the evolver with Gemini client.
         
         Args:
-            model: Model name (e.g., 'gpt-4o', 'gpt-4o-mini')
+            model: Model name (e.g., 'gemini-1.5-flash', 'gemini-1.5-pro')
             temperature: Sampling temperature (0-1, higher = more creative)
             max_retries: Max retry attempts for LLM calls
         """
-        api_key = os.getenv('OPENAI_API_KEY')
+        api_key = os.getenv('GOOGLE_API_KEY') or os.getenv('GEMINI_API_KEY')
         if not api_key:
-            raise ValueError("OPENAI_API_KEY not set in .env file")
+            raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY not set in .env file")
         
-        self.client = OpenAI(api_key=api_key)
-        self.model = model
-        self.temperature = temperature
+        genai.configure(api_key=api_key)
+        self.model_name = model
+        self.model = genai.GenerativeModel(
+            model_name=model,
+            generation_config={
+                "temperature": temperature,
+                "top_p": 0.95,
+                "max_output_tokens": 2000,
+            }
+        )
         self.max_retries = max_retries
         self.call_count = 0
         self.total_tokens = 0
@@ -44,7 +52,7 @@ class CodeEvolver:
             str: Improved Python code string
         """
         
-        system_message = """You are an expert in geostatistics and Python kriging algorithms.
+        system_instructions = """You are an expert in geostatistics and Python kriging algorithms.
 Your task is to improve kriging code to reduce RMSE (mean squared error) in spatial interpolation.
 
 CRITICAL RULES:
@@ -58,7 +66,9 @@ CRITICAL RULES:
 
 Output format: PURE PYTHON CODE ONLY."""
         
-        user_message = f"""Current kriging code:
+        user_message = f"""{system_instructions}
+
+Current kriging code:
 ```python
 {current_code}
 ```
@@ -70,21 +80,15 @@ Generate improved code that addresses the weakness. Return ONLY the Python code.
         
         for attempt in range(self.max_retries):
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_message},
-                        {"role": "user", "content": user_message}
-                    ],
-                    temperature=self.temperature,
-                    max_tokens=2000,
-                    top_p=0.95
-                )
+                response = self.model.generate_content(user_message)
+                time.sleep(2)  # Avoid rate limits
                 
                 self.call_count += 1
-                self.total_tokens += response.usage.prompt_tokens + response.usage.completion_tokens
+                # Gemini doesn't always provide token counts in the same way as OpenAI, 
+                # but we can try to estimate or get it if available
+                # For simplicity in MVP, we'll just track calls
                 
-                code = response.choices[0].message.content.strip()
+                code = response.text.strip()
                 
                 # Clean up markdown code blocks if present
                 code = self._extract_code(code)
@@ -120,8 +124,7 @@ Generate improved code that addresses the weakness. Return ONLY the Python code.
         """Return API usage statistics"""
         return {
             'calls': self.call_count,
-            'total_tokens': self.total_tokens,
-            'avg_tokens_per_call': self.total_tokens / self.call_count if self.call_count > 0 else 0
+            'model': self.model_name
         }
 
 
@@ -145,9 +148,12 @@ def evaluate(dataset):
     
     prompt = "Try using a Gaussian variogram model instead of spherical."
     
-    evolver = CodeEvolver(model="gpt-4o-mini", temperature=0.8)
-    improved_code = evolver.mutate(test_code, prompt)
-    
-    print("Improved code:")
-    print(improved_code)
-    print(f"\nStats: {evolver.get_stats()}")
+    # Note: Requires GOOGLE_API_KEY in .env
+    try:
+        evolver = CodeEvolver(model="gemini-1.5-flash", temperature=0.8)
+        improved_code = evolver.mutate(test_code, prompt)
+        print("Improved code:")
+        print(improved_code)
+        print(f"\nStats: {evolver.get_stats()}")
+    except Exception as e:
+        print(f"Test failed: {e}")

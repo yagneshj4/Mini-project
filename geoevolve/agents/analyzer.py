@@ -1,33 +1,41 @@
 import json
 import os
 import re
+import time
 from dotenv import load_dotenv
-from openai import OpenAI
+import google.generativeai as genai
 
 load_dotenv()
 
 class CodeAnalyzer:
     """
     LLM-based code analyzer that identifies weaknesses in kriging algorithms.
-    Returns structured feedback for improvement and RAG query terms.
+    Returns structured feedback for improvement and RAG query terms using Gemini.
     """
     
-    def __init__(self, model="gpt-4o-mini", temperature=0.3, max_retries=3):
+    def __init__(self, model="gemini-flash-latest", temperature=0.3, max_retries=3):
         """
         Initialize the analyzer.
         
         Args:
-            model: Model name (gpt-4o-mini is faster/cheaper for analysis)
+            model: Model name (gemini-1.5-flash is fast/cheap)
             temperature: Lower for more consistent analysis
             max_retries: Max retry attempts
         """
-        api_key = os.getenv('OPENAI_API_KEY')
+        api_key = os.getenv('GOOGLE_API_KEY') or os.getenv('GEMINI_API_KEY')
         if not api_key:
-            raise ValueError("OPENAI_API_KEY not set in .env file")
+            raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY not set in .env file")
         
-        self.client = OpenAI(api_key=api_key)
-        self.model = model
-        self.temperature = temperature
+        genai.configure(api_key=api_key)
+        self.model_name = model
+        self.model = genai.GenerativeModel(
+            model_name=model,
+            generation_config={
+                "temperature": temperature,
+                "top_p": 0.95,
+                "max_output_tokens": 1000,
+            }
+        )
         self.max_retries = max_retries
     
     def analyze(self, code: str, rmse: float) -> dict:
@@ -46,13 +54,15 @@ class CodeAnalyzer:
             }
         """
         
-        system_message = """You are an expert geospatial data scientist specializing in kriging and spatial interpolation.
+        system_instructions = """You are an expert geospatial data scientist specializing in kriging and spatial interpolation.
 Analyze the provided kriging code and identify ONE key weakness that likely causes high RMSE.
 Focus on algorithmic limitations, not minor code style issues.
 
 Return ONLY valid JSON with no additional text."""
         
-        user_message = f"""Analyze this kriging code. Current RMSE: {rmse:.4f}
+        user_message = f"""{system_instructions}
+
+Analyze this kriging code. Current RMSE: {rmse:.4f}
 
 Code:
 ```python
@@ -68,17 +78,9 @@ Identify the main algorithmic weakness. Return JSON:
         
         for attempt in range(self.max_retries):
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_message},
-                        {"role": "user", "content": user_message}
-                    ],
-                    temperature=self.temperature,
-                    max_tokens=500
-                )
-                
-                response_text = response.choices[0].message.content.strip()
+                response = self.model.generate_content(user_message)
+                time.sleep(2)  # Avoid rate limits
+                response_text = response.text.strip()
                 
                 # Try to extract JSON
                 json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
@@ -89,22 +91,13 @@ Identify the main algorithmic weakness. Return JSON:
                     if 'weakness' in analysis and 'query' in analysis:
                         return analysis
                 
-                # Fallback structured response
+                # Fallback structured response if JSON parsing fails
                 return {
                     'weakness': 'The variogram model may not be optimal for the spatial structure',
                     'query': 'variogram model selection kriging',
                     'suggestion': 'Try multiple variogram models and select based on cross-validation'
                 }
                 
-            except json.JSONDecodeError:
-                print(f"JSON decode attempt {attempt + 1} failed, retrying...")
-                if attempt == self.max_retries - 1:
-                    # Return safe default
-                    return {
-                        'weakness': 'The algorithm uses a fixed variogram model without adaptation',
-                        'query': 'adaptive kriging variogram selection',
-                        'suggestion': 'Implement variogram model selection cross-validation'
-                    }
             except Exception as e:
                 print(f"Analysis attempt {attempt + 1} failed: {e}")
                 if attempt == self.max_retries - 1:
@@ -140,8 +133,10 @@ def evaluate(dataset):
     return rmse
 """
     
-    analyzer = CodeAnalyzer(model="gpt-4o-mini")
-    analysis = analyzer.analyze(test_code, rmse=0.91)
-    
-    print("Analysis:")
-    print(json.dumps(analysis, indent=2))
+    try:
+        analyzer = CodeAnalyzer(model="gemini-1.5-flash")
+        analysis = analyzer.analyze(test_code, rmse=0.91)
+        print("Analysis:")
+        print(json.dumps(analysis, indent=2))
+    except Exception as e:
+        print(f"Test failed: {e}")
