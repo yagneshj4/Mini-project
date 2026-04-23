@@ -1,0 +1,10 @@
+n_iterations: 5
+outer_iterations: 1
+inner_iterations: 5
+task: kriging
+dataset: Cu
+model: gpt-4o
+temperature: 0.8
+reset_kb: false
+top_k_rag: 5
+max_retries: 3
