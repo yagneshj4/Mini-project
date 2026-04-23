@@ -1,0 +1,179 @@
+﻿Total pages: 25
+Done writing to file
+
+
+--- PAGE 1 ---
+000
+001
+002
+003
+004
+005
+006
+007
+008
+009
+010
+011
+012
+013
+014
+015
+016
+017
+018
+019
+020
+021
+022
+023
+024
+025
+026
+027
+028
+029
+030
+031
+032
+033
+034
+035
+036
+037
+038
+039
+040
+041
+042
+043
+044
+045
+046
+047
+048
+049
+050
+051
+052
+053
+Under review as a conference paper at ICLR 2026
+GEOEVOLVE:
+AUTOMATING GEOSPATIAL MODEL
+DISCOVERY VIA MULTI-AGENT LARGE LANGUAGE
+MODELS
+Anonymous authors
+Paper under double-blind review
+ABSTRACT
+Geospatial modeling provides critical solutions for pressing global challenges
+such as sustainability and climate change.
+Existing large language model
+(LLM)ΓÇôbased algorithm discovery frameworks, such as AlphaEvolve, excel at
+generic code evolution but lack the domain knowledge required for complex
+geospatial problems. We introduce GeoEvolve, a multi-agent LLM framework
+that couples evolutionary search with dynamic geospatial domain knowledge.
+GeoEvolve operates in nested loops: an inner code evolver generates candidate so-
+lutions, while an outer agentic controllerΓÇösupported by Automated Knowledge
+Construction and Code-to-Formula agentsΓÇöqueries a Dynamic GeoKnowRAG
+module to inject theoretical priors. This architecture addresses the challenges
+of spatial heterogeneity and temporal non-stationarity. We evaluate GeoEvolve
+on three classical tasks: spatial interpolation (Kriging), uncertainty quantification
+(GeoCP), and spatial regression (GWR). Across 9 datasets, GeoEvolve discovers
+novel algorithms that incorporate geospatial theory. It achieves significant gains,
+such as a 29.5% increase in regression R2 and a 13ΓÇô21% reduction in interpola-
+tion error. Furthermore, extensive ablation studies confirm GeoEvolveΓÇÖs robust-
+ness across diverse foundation models (GPT, Gemini, Qwen) and its spatiotempo-
+ral generalizability, validating that domain-guided retrieval is essential for stable
+evolution. Collectively, these results offer a scalable path toward trustworthy, au-
+tomated geospatial modeling, opening new avenues for efficient AI-for-Science
+discovery.
+1
+INTRODUCTION
+Beyond building powerful AI models that help us analyze data and understand the world, enabling
+AI models to evolve on their own and autonomously extract knowledge stands as the next important
+and promising frontier. It usually involves a prolonged procedure of asking a research question,
+gathering relevant information, analyzing it to identify patterns or insights, and communicating the
+results as new knowledge. The rise of the large language models (LLMs), such as GPT-4 (Achiam
+et al., 2023) and Gemini (Comanici et al., 2025), presents the possibility of accelerating and au-
+tomating this knowledge discovery procedure. The confidence in this direction is supported by the
+breakthroughs in LLMs, such as retrieval augmented generation (RAG) that enhances the output of
+LLMs (Lewis et al., 2020; Jiang et al., 2023) and agents that execute complex tasks autonomously
+(Li et al., 2023; Qian et al., 2024). In fact, the integration of LLMs into this procedure has al-
+ready boosted the performance of a range of discovery-oriented tasks, such as drug repurposing
+(Huang et al., 2024), hypothesis generation (Kumbhar et al., 2025; Xiong et al., 2024), chip design
+(Ho & Ren, 2024), urban planning (Zhou et al., 2024). Recently, Google introduced AlphaEvolve,
+which has demonstrated remarkable capabilities in automating algorithm discovery across diverse
+domains, such as tackling complex mathematical optimization problems. Building on this foun-
+dation, OpenEvolve has been developed as an open-source implementation of Google DeepMindΓÇÖs
+AlphaEvolve, providing the research community with accessible tools for further exploration and
+application.
+Despite these advances, the domain of geospatial modeling remains relatively underexplored in
+the context of LLM-driven knowledge discovery. Geospatial problems are inherently complicated,
+1
+
+
+--- PAGE 2 ---
+054
+055
+056
+057
+058
+059
+060
+061
+062
+063
+064
+065
+066
+067
+068
+069
+070
+071
+072
+073
+074
+075
+076
+077
+078
+079
+080
+081
+082
+083
+084
+085
+086
+087
+088
+089
+090
+091
+092
+093
+094
+095
+096
+097
+098
+099
+100
+101
+102
+103
+104
+105
+106
+107
+Under review as a conference paper at ICLR 2026
+characterized by spatial autocorrelation (Miller, 2004), spatial heterogeneity (Cheng et al., 2024),
+scale effect (Chen et al., 2019), and diverse modalities (e.g., maps, remote sensing imagery, spatial
+network, and textual description) (Mai et al., 2023), etc. Moreover, addressing geospatial problems
+also demands synthesizing knowledge across different disciplines, from environmental science to
+urban studies, making it difficult for single-agent systems to provide comprehensive solutions.
+In this paper, we introduce GeoEvolve, an advanced agent combining the evolutionary process with
+LLM-based code generation and geospatial knowledge-informed RAG (GeoKnowRAG) to automat-
+ically investigate optimal geospatial modeling. GeoEvolve operates in two complementary loops.
+As is shown in Figure 1, the inner loop runs OpenEvolve (Sharma, 2025) for a 
